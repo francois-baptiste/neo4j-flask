@@ -95,7 +95,7 @@ class User:
                COLLECT(DISTINCT tag.name) AS tags
         '''
 
-        return graph.run(query, they=other.username, you=self.username).next
+        return graph.run(query, they=other.username, you=self.username).next()
 
 def get_todays_recent_posts():
     query = '''

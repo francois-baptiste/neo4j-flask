@@ -1,20 +1,21 @@
 from py2neo import Node, Relationship
 import uuid
 from .graph import GRAPH
-from  .neo4jutils import get_neo_label, get_neo_prop
+from  .neo4jutils import Neo4jUtils
 from .text_utils import TextCleanUp
 
 class BaseNode:
-    def __init__(self, label: str, identity_key: str, identity_value: object, values: dict = None, allow_update: bool = False, tx = None):
-        if TextCleanUp.is_empty_string(label):
+    def __init__(self, label: str, identity_key: str = id, identity_value: object = str(uuid.uuid4()), values: dict = None, allow_update: bool = False, tx = None):
+        tc = TextCleanUp()
+        if tc.is_empty_string(label):
             raise ValueError("label must be specified")
-        if TextCleanUp.is_empty_string(identity_key):
+        if tc.is_empty_string(identity_key):
             raise ValueError("identity_key must be specified")
-        if TextCleanUp.is_empty_string(identity_value):
+        if tc.is_empty_string(identity_value):
             raise ValueError("identity_value must be specified")
-            
-        self.label = get_neo_label(label)
-        self.identity_key = get_neo_prop(identity_key)
+
+        self.label = Neo4jUtils.get_neo_label(label)
+        self.identity_key = Neo4jUtils.get_neo_prop(identity_key)
         self.identity_value = identity_value            
         self.allow_update = allow_update
         self.tx = tx

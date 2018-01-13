@@ -92,7 +92,7 @@ def profile(username):
     if logged_in_username:
         logged_in_user = User(logged_in_username)
 
-        if logged_in_user.username == user_being_viewed.username:
+        if logged_in_user.identity_value == user_being_viewed.identity_value:
             similar = logged_in_user.get_similar_users()
         else:
             common = logged_in_user.get_commonality_of_user(user_being_viewed)

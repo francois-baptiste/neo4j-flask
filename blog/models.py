@@ -1,27 +1,21 @@
+import os
+import sys
+import uuid
 from py2neo import Graph, Node, Relationship
 from passlib.hash import bcrypt
-from datetime import datetime
-import os
-import uuid
+from common import GRAPH, BaseNode, neo4jutils
 
-url = os.environ.get('GRAPHENEDB_URL', 'http://localhost:7474')
-username = os.environ.get('NEO4J_USERNAME')
-password = os.environ.get('NEO4J_PASSWORD')
 
-graph = Graph(url + '/db/data/', username=username, password=password)
-
-class User:
+class User(BaseNode):
     def __init__(self, username):
-        self.username = username
-
-    def find(self):
-        user = graph.find_one('User', 'username', self.username)
-        return user
+        BaseNode.__init__(self, 'User', 'username', username, allow_update = False)
 
     def register(self, password):
         if not self.find():
-            user = Node('User', username=self.username, password=bcrypt.encrypt(password))
-            graph.create(user)
+            values = {
+                "password": bcrypt.encrypt(password)
+            }
+            self.update(values)
             return True
         else:
             return False
@@ -35,83 +29,75 @@ class User:
 
     def add_post(self, title, tags, text):
         user = self.find()
-        post = Node(
-            'Post',
-            id=str(uuid.uuid4()),
-            title=title,
-            text=text,
-            timestamp=timestamp(),
-            date=date()
-        )
-        rel = Relationship(user, 'PUBLISHED', post)
-        graph.create(rel)
+
+        new_post_values = {
+            "title": title,
+            "text": text,
+            "timestamp": neo4jutils.timestamp(),
+            "date": neo4jutils.date()
+        }
+
+        post = BaseNode('Post', 'id', str(uuid.uuid4()), new_post_values)
+        self.join(post, 'PUBLISHED')
 
         tags = [x.strip() for x in tags.lower().split(',')]
         for name in set(tags):
-            tag = Node('Tag', name=name)
-            graph.merge(tag)
-
-            rel = Relationship(tag, 'TAGGED', post)
-            graph.create(rel)
+            tag = BaseNode('Tag', 'name', name)
+            post.join(tag, 'TAGGED', None, False)
 
     def like_post(self, post_id):
-        user = self.find()
-        post = graph.find_one('Post', 'id', post_id)
-        graph.merge(Relationship(user, 'LIKED', post))
+        self.join_simple_relationship(
+            'Post',
+            'id',
+            post_id,
+            'LIKED')
 
     def get_recent_posts(self):
         query = '''
-        MATCH (user:User)-[:PUBLISHED]->(post:Post)<-[:TAGGED]-(tag:Tag)
+        MATCH (user:USER)-[:PUBLISHED]->(post:POST)
+        OPTIONAL MATCH (post)<-[:TAGGED]-(tag:TAG)
         WHERE user.username = {username}
         RETURN post, COLLECT(tag.name) AS tags
         ORDER BY post.timestamp DESC LIMIT 5
         '''
 
-        return graph.run(query, username=self.username)
+        return GRAPH.run(query, username=self.identity_value)
 
     def get_similar_users(self):
         # Find three users who are most similar to the logged-in user
         # based on tags they've both blogged about.
         query = '''
-        MATCH (you:User)-[:PUBLISHED]->(:Post)<-[:TAGGED]-(tag:Tag),
-              (they:User)-[:PUBLISHED]->(:Post)<-[:TAGGED]-(tag)
+        MATCH (you:USER)-[:PUBLISHED]->(:POST)<-[:TAGGED]-(tag:TAG),
+              (they:USER)-[:PUBLISHED]->(:POST)<-[:TAGGED]-(tag)
         WHERE you.username = {username} AND you <> they
         WITH they, COLLECT(DISTINCT tag.name) AS tags
         ORDER BY SIZE(tags) DESC LIMIT 3
         RETURN they.username AS similar_user, tags
         '''
 
-        return graph.run(query, username=self.username)
+        return GRAPH.run(query, username=self.identity_value)
 
     def get_commonality_of_user(self, other):
         # Find how many of the logged-in user's posts the other user
         # has liked and which tags they've both blogged about.
         query = '''
-        MATCH (they:User {username: {they} })
-        MATCH (you:User {username: {you} })
-        OPTIONAL MATCH (they)-[:PUBLISHED]->(:Post)<-[:TAGGED]-(tag:Tag),
-                       (you)-[:PUBLISHED]->(:Post)<-[:TAGGED]-(tag)
-        RETURN SIZE((they)-[:LIKED]->(:Post)<-[:PUBLISHED]-(you)) AS likes,
+        MATCH (they:USER {username: {they} })
+        MATCH (you:USER {username: {you} })
+        OPTIONAL MATCH (they)-[:PUBLISHED]->(:POST)<-[:TAGGED]-(tag:TAG),
+                       (you)-[:PUBLISHED]->(:POST)<-[:TAGGED]-(tag)
+        RETURN SIZE((they)-[:LIKED]->(:POST)<-[:PUBLISHED]-(you)) AS likes,
                COLLECT(DISTINCT tag.name) AS tags
         '''
 
-        return graph.run(query, they=other.username, you=self.username).next
+        return GRAPH.run(query, they=other.identity_value, you=self.identity_value).next()
+
 
 def get_todays_recent_posts():
     query = '''
-    MATCH (user:User)-[:PUBLISHED]->(post:Post)<-[:TAGGED]-(tag:Tag)
+    MATCH (user:USER)-[:PUBLISHED]->(post:POST)<-[:TAGGED]-(tag:TAG)
     WHERE post.date = {today}
     RETURN user.username AS username, post, COLLECT(tag.name) AS tags
     ORDER BY post.timestamp DESC LIMIT 5
     '''
 
-    return graph.run(query, today=date())
-
-def timestamp():
-    epoch = datetime.utcfromtimestamp(0)
-    now = datetime.now()
-    delta = now - epoch
-    return delta.total_seconds()
-
-def date():
-    return datetime.now().strftime('%Y-%m-%d')
+    return GRAPH.run(query, today=neo4jutils.date())

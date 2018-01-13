@@ -1,6 +1,13 @@
+import sys
 from .views import app
-from .models import graph
 
-graph.schema.create_uniqueness_constraint("User", "username")
-graph.schema.create_uniqueness_constraint("Tag", "name")
-graph.schema.create_uniqueness_constraint("Post", "id")
+sys.path.append("..")
+from common import GRAPH, BaseNode, Neo4jUtils
+
+def create_indexes():
+    neo_utils = Neo4jUtils(GRAPH)
+    neo_utils.create_graph_unique_constraint("User", "username")
+    neo_utils.create_graph_unique_constraint("Tag", "name")
+    neo_utils.create_graph_unique_constraint("Post", "id")
+
+create_indexes()

@@ -77,7 +77,7 @@ class BaseNode:
             if not allow_self_reference:
                 return None
 
-        relationship_neo = get_neo_label(relationship)
+        relationship_neo = Neo4jUtils.get_neo_label(relationship)
         if outgoing:
             product_relationship = Relationship(node, relationship_neo, other_node)
         else:
@@ -85,7 +85,7 @@ class BaseNode:
 
         if relationship_properties is not None:
             for item in relationship_properties:
-                product_relationship[get_neo_prop(item)] = relationship_properties[item]
+                product_relationship[Neo4jUtils.get_neo_prop(item)] = relationship_properties[item]
 
         if self.tx is None:
             return GRAPH.merge(product_relationship)

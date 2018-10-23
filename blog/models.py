@@ -1,7 +1,4 @@
-import os
-import sys
 import uuid
-from py2neo import Graph, Node, Relationship
 from passlib.hash import bcrypt
 from common import GRAPH, BaseNode, neo4jutils
 
@@ -33,8 +30,8 @@ class User(BaseNode):
         new_post_values = {
             "title": title,
             "text": text,
-            "timestamp": neo4jutils.timestamp(),
-            "date": neo4jutils.date()
+            "timestamp": neo4jutils.Neo4jUtils.timestamp(),
+            "date": neo4jutils.Neo4jUtils.date()
         }
 
         post = BaseNode('Post', 'id', str(uuid.uuid4()), new_post_values)
@@ -100,4 +97,4 @@ def get_todays_recent_posts():
     ORDER BY post.timestamp DESC LIMIT 5
     '''
 
-    return GRAPH.run(query, today=neo4jutils.date())
+    return GRAPH.run(query, today=neo4jutils.Neo4jUtils.date())
